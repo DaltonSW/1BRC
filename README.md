@@ -6,4 +6,6 @@ Running the 1 Billion Row Challenge in a few different languages, to faciliate l
 
 ## Go
 
-First success: 147.06s (2m 27.06s)
+| Attempt | Time | Change |
+| :-------: | :--: | :----: |
+| #1 | 147.06s (2m 27.06s) | Naive implementation|
