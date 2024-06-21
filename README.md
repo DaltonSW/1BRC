@@ -42,10 +42,12 @@ Conakry;31.2
 Istanbul;23.0
 ```
 
-The task is to write a Java program which reads the file, calculates the min, mean, and max temperature value per weather station, and emits the results sorted alphabetically by station name, and the result values per station in the format `<min>/<mean>/<max>`, rounded to one fractional digit
+The task is to write a program which reads the file, calculates the min, mean, and max temperature value per weather station, and emits the results sorted alphabetically by station name, and the result values per station in the format `<min>/<mean>/<max>`, rounded to one fractional digit
 
-## Go
+## Test Environment 
 
-| Attempt | Time | Change |
-| :-------: | :--: | :----: |
-| #1 | 147.06s (2m 27.06s) | Naive implementation|
+Unless otherwise stated, all of these tests are performed in the environment below: 
+
+OS: WSL 2 Ubuntu on Windows 11
+CPU: Intel i9-12900K (24 Cores) @ 3.19 GHz
+RAM: 32GB @ 3200MHz (Though WSL only reports 16GB, so maybe that)

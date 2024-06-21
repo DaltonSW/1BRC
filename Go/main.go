@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	// "math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -19,21 +22,36 @@ func main() {
 	defer input.Close()
 
 	counts := make(map[string]int)
-	avgs := make(map[string]float32)
+	totals := make(map[string]float64)
+	mins := make(map[string]float64)
+	maxs := make(map[string]float64)
 
 	scanner := bufio.NewScanner(input)
 	for scanner.Scan() {
 		line := strings.Split(scanner.Text(), ";")
 		city := line[0]
-		temp64, _ := strconv.ParseFloat(line[1], 32)
-		temp := float32(temp64)
+		temp, _ := strconv.ParseFloat(line[1], 32)
 
-		count := counts[city] + 1
-		tempAvg := float32(avgs[city] * float32(count-1))
+		totals[city] += temp
+		counts[city] += 1
 
-		avgs[city] = float32(tempAvg+temp) / float32(count)
-		counts[city] = count
+		if temp < mins[city] {
+			mins[city] = temp
+			continue
+		} else if temp > maxs[city] {
+			maxs[city] = temp
+		}
 
 	}
 
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		avg := totals[k] / float64(counts[k])
+		fmt.Println(fmt.Sprintf("%s %.1f %.1f %.1f", k, mins[k], avg, maxs[k]))
+		// fmt.Println(k, mins[k], math.Floor(avg*10)/10, maxs[k])
+	}
 }
