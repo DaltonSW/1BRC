@@ -27,3 +27,9 @@ So what changed with this implementation?
 
 
 *Nothing* changed as far as float parsing, calculations, or formatting is concerned, nor did I implement any goroutines. Plenty of optimization to be had!
+
+## 3rd implementation - 3m 7.277s (187.277)
+
+So... it got worse? Honestly not too surprised, this was my first attempt at implementing multithreading / go routines, and I've got no idea what the hell I'm doing!
+
+But that's ok! Back to profiling and seeing what the bottleneck is now. 
