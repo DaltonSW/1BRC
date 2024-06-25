@@ -1,6 +1,6 @@
 # Go
 
-**Current Best: 80.785s**
+**Current Best: 50.025s**
 
 ## 1st implementation - 2m 30.66s (150.66)
 
@@ -33,3 +33,7 @@ So what changed with this implementation?
 So... it got worse? Honestly not too surprised, this was my first attempt at implementing multithreading / go routines, and I've got no idea what the hell I'm doing!
 
 But that's ok! Back to profiling and seeing what the bottleneck is now. 
+
+## 4th implementation - 50.025s
+
+Holy moly, down under a minute. Wild what happens when you actually research how to implement concurrency properly. There's definitely still some remnants of old mutex junk that can be cleaned up, and I'll probably futz around with some buffer size tweaking too to see where this can improve, but I'm pumped about the time savings. :)
