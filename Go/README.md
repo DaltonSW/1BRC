@@ -1,6 +1,6 @@
 # Go
 
-**Current Best: 50.025s**
+**Current Best: 51.482s**
 
 ## 1st implementation - 2m 30.66s (150.66)
 
@@ -34,6 +34,10 @@ So... it got worse? Honestly not too surprised, this was my first attempt at imp
 
 But that's ok! Back to profiling and seeing what the bottleneck is now. 
 
-## 4th implementation - 50.025s
+## 4th implementation - 54.025s
 
 Holy moly, down under a minute. Wild what happens when you actually research how to implement concurrency properly. There's definitely still some remnants of old mutex junk that can be cleaned up, and I'll probably futz around with some buffer size tweaking too to see where this can improve, but I'm pumped about the time savings. :)
+
+## 5th implementation - 51.492s
+
+lol I realized I had the const MBs but it wasn't multiplied, I'm a fool. Did this run wiht 32MB buffer for a slight improvement.
