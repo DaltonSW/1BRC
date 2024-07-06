@@ -94,6 +94,7 @@ func check(e error) {
 
 const KBs = 1024
 const MBs = 1024 * KBs
+const TestCount = 10
 
 func main() {
 	file, err := os.Create("1BRC.prof")
@@ -102,9 +103,14 @@ func main() {
 	defer pprof.StopCPUProfile()
 
 	start := time.Now()
-	Run1BRC(false, 8*MBs)
+	for i := 0; i < TestCount; i++ {
+		Run1BRC(false, 8*MBs)
+	}
 	elapsed := time.Since(start)
-	fmt.Printf("Processing took %s\n", elapsed)
+	average := elapsed / TestCount
+	fmt.Printf("Processing %d tests.\n", TestCount)
+	fmt.Printf("Took a total of %s\n", elapsed)
+	fmt.Printf("Took an average of %s\n", average)
 }
 
 func Run1BRC(test bool, bufferSize int) {
