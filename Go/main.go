@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	// "math"
 	"os"
@@ -55,9 +56,9 @@ type mapHandler struct {
 }
 
 func (handler *mapHandler) process(name string, in string) {
-	handler.mu.RLock()
+	//handler.mu.RLock()
 	c, exist := handler.mapping[name]
-	handler.mu.RUnlock()
+	//handler.mu.RUnlock()
 
 	if !exist {
 		c = NewCity()
@@ -99,7 +100,11 @@ func main() {
 	check(err)
 	pprof.StartCPUProfile(file)
 	defer pprof.StopCPUProfile()
+
+	start := time.Now()
 	Run1BRC(false, 8*MBs)
+	elapsed := time.Since(start)
+	fmt.Printf("Processing took %s\n", elapsed)
 }
 
 func Run1BRC(test bool, bufferSize int) {

@@ -1,6 +1,6 @@
 # Go
 
-**Current Best: 51.482s**
+**Current Best: 36.669s**
 
 ## 1st implementation - 2m 30.66s (150.66)
 
@@ -41,3 +41,9 @@ Holy moly, down under a minute. Wild what happens when you actually research how
 ## 5th implementation - 51.492s
 
 lol I realized I had the const MBs but it wasn't multiplied, I'm a fool. Did this run wiht 32MB buffer for a slight improvement.
+
+## 6th implementation - 36.669s
+
+First attempt just had me increase the buffer size to 1000MB. Instantly got a crash, so reverted that. Decided to profile again, and saw a mess of concurrency lockin attempts.
+
+Commented out the RLock/RUnlock for the Handler's city access, and that alone managed to drop the time down this much. While I don't have the expected min/max to compare, all of the averages were correct. I have to reasonably assume that it calculated min/max correctly if it was able to average correctly. (Hopefully that assumption won't be foiled by me having done something stupid...)

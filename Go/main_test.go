@@ -4,6 +4,12 @@ import (
 	"testing"
 )
 
+func BenchmarkTest1GB(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Run1BRC(true, 1000*MBs)
+	}
+}
+
 func BenchmarkTest512MB(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Run1BRC(true, 512*MBs)
@@ -57,6 +63,6 @@ func BenchmarkTest2MB(b *testing.B) {
 }
 func BenchmarkReal1BRC(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		Run1BRC(false, 32*MBs)
+		Run1BRC(false, 2*MBs)
 	}
 }
