@@ -2,12 +2,11 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
-	// "math"
 	"os"
 	"runtime/pprof"
 	"sort"
@@ -22,37 +21,33 @@ import (
 
 type city struct {
 	count int
-	total float64
-	min   float64
-	max   float64
+	total int
+	min   int
+	max   int
 	mu    sync.RWMutex
 }
 
 func NewCity() *city {
 	c := city{}
 
-	c.max = -1e99
-	c.min = 1e99
+	c.max = -99999
+	c.min = 99999
 
 	return &c
 }
 
-func (c *city) process(in float64) {
+func (c *city) process(in int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.count += 1
 	c.total += in
-	if in < c.min {
-		c.min = in
-		return
-	} else if in > c.max {
-		c.max = in
-	}
+	c.min = min(c.min, in)
+	c.max = max(c.max, in)
 }
 
-func (c *city) getAvg() float64 {
-	return c.total / float64(c.count)
+func (c *city) getAvg() int {
+	return c.total / c.count
 }
 
 type mapHandler struct {
@@ -60,7 +55,7 @@ type mapHandler struct {
 	mu      sync.RWMutex
 }
 
-func (handler *mapHandler) process(name string, in string) {
+func (handler *mapHandler) process(name string, numIn string) {
 	c, exist := handler.mapping[name]
 
 	if !exist {
@@ -70,10 +65,9 @@ func (handler *mapHandler) process(name string, in string) {
 		handler.mu.Unlock()
 	}
 
-	float, err := strconv.ParseFloat(in, 64)
-	check(err)
-
-	c.process(float)
+	numLen := len(numIn)
+	tempAsInt, _ := strconv.Atoi(numIn[:numLen-2] + string(numIn[numLen-1]))
+	c.process(tempAsInt)
 }
 
 func (handler *mapHandler) getSortedKeys() []string {
@@ -89,25 +83,33 @@ func (handler *mapHandler) getCity(name string) *city {
 	return handler.mapping[name]
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 const KBs = 1024
 const MBs = 1024 * KBs
-const TestCount = 10
+const TestCount = 1
+
+const DecimalMult = 0.1
+
+func startProfiling() {
+	file, err := os.Create("1BRC.prof")
+	if err != nil {
+		fmt.Println("Couldn't open profiling file")
+		os.Exit(1)
+	}
+	pprof.StartCPUProfile(file)
+}
 
 func main() {
-	file, err := os.Create("1BRC.prof")
-	check(err)
-	pprof.StartCPUProfile(file)
-	defer pprof.StopCPUProfile()
+	profPtr := flag.Bool("prof", false, "Profile the program")
+
+	flag.Parse()
+	if *profPtr {
+		startProfiling()
+		defer pprof.StopCPUProfile()
+	}
 
 	start := time.Now()
 	for i := 0; i < TestCount; i++ {
-		Run1BRC(false, 8*MBs)
+		Run1BRC(false, 1*MBs)
 	}
 	elapsed := time.Since(start)
 	average := elapsed / TestCount
@@ -125,7 +127,10 @@ func Run1BRC(test bool, bufferSize int) {
 	} else {
 		input, err = os.Open("../measurements.txt")
 	}
-	check(err)
+	if err != nil {
+		fmt.Println("Couldn't open measurements file!")
+		os.Exit(1)
+	}
 	defer input.Close()
 
 	lineBuffer := make([]byte, bufferSize)
@@ -136,12 +141,8 @@ func Run1BRC(test bool, bufferSize int) {
 	remainder := ""
 
 	for {
-		num, err := fileReader.Read(lineBuffer)
+		num, _ := fileReader.Read(lineBuffer)
 		if num == 0 {
-			if err == io.EOF {
-				break
-			}
-			check(err)
 			break
 		}
 
@@ -168,8 +169,7 @@ func Run1BRC(test bool, bufferSize int) {
 
 	for k := range keys {
 		c := handler.getCity(keys[k])
-
-		fmt.Println(fmt.Sprintf("%s %.1f %.1f %.1f", keys[k], c.min, c.getAvg(), c.max))
+		fmt.Println(fmt.Sprintf("%s=%.1f/%.1f/%.1f", keys[k], float64(c.min)*DecimalMult, float64(c.getAvg())*DecimalMult, float64(c.max)*DecimalMult))
 	}
 }
 
