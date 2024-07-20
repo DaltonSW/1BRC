@@ -15,6 +15,11 @@ import (
 	"strings"
 )
 
+// NOTE: 1BRC Requirements
+//	Each row: <string: station name>;<double: measurement with EXACTLY one fractional digit>
+//	Must calculate min, max, and average for each city
+//	Must output them to stdout, alphabetically sorted by city name, in the format "name=min/mean/max"
+
 type city struct {
 	count int
 	total float64
@@ -56,9 +61,7 @@ type mapHandler struct {
 }
 
 func (handler *mapHandler) process(name string, in string) {
-	//handler.mu.RLock()
 	c, exist := handler.mapping[name]
-	//handler.mu.RUnlock()
 
 	if !exist {
 		c = NewCity()
