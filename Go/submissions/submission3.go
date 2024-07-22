@@ -18,7 +18,6 @@ type city struct {
 	total float64
 	min   float64
 	max   float64
-	mu    sync.RWMutex
 }
 
 func NewCity() *city {
@@ -30,11 +29,7 @@ func NewCity() *city {
 	return &c
 }
 
-// TODO: Try implementing a channel per city so that each city doesn't need a mutex
 func (c *city) process(in float64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.count += 1
 	c.total += in
 	if in < c.min {
@@ -45,28 +40,23 @@ func (c *city) process(in float64) {
 	}
 }
 
-func (c *city) getAvg() float64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c city) getAvg() float64 {
 	return c.total / float64(c.count)
 }
 
 type mapHandler struct {
 	mapping map[string]*city
-	mu      sync.RWMutex
+	mu      sync.Mutex
 }
 
 func (handler *mapHandler) process(name string, in string) {
-	handler.mu.RLock()
-	c, exist := handler.mapping[name]
-	handler.mu.RUnlock()
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
 
+	c, exist := handler.mapping[name]
 	if !exist {
 		c = NewCity()
-		handler.mu.Lock()
 		handler.mapping[name] = c
-		handler.mu.Unlock()
 	}
 
 	float, err := strconv.ParseFloat(in, 64)
@@ -76,8 +66,8 @@ func (handler *mapHandler) process(name string, in string) {
 }
 
 func (handler *mapHandler) getSortedKeys() []string {
-	// handler.mu.Lock()
-	// defer handler.mu.Unlock()
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
 
 	keys := make([]string, 0, len(handler.mapping))
 	for k := range handler.mapping {
@@ -88,8 +78,8 @@ func (handler *mapHandler) getSortedKeys() []string {
 }
 
 func (handler *mapHandler) getCity(name string) *city {
-	// handler.mu.Lock()
-	// defer handler.mu.Unlock()
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
 
 	return handler.mapping[name]
 }
@@ -109,8 +99,7 @@ func main() {
 }
 
 const ChunkSize = 2048
-const BufferSize = 1000
-const NumWorkers = 6
+const NumWorkers = 4
 
 func Run1BRC(test bool) {
 	var input *os.File
@@ -124,7 +113,7 @@ func Run1BRC(test bool) {
 	check(err)
 	defer input.Close()
 
-	lines := make(chan string, BufferSize)
+	lines := make(chan string, 100)
 	var wg sync.WaitGroup
 
 	handler := mapHandler{mapping: make(map[string]*city)}

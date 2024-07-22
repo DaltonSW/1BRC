@@ -4,6 +4,10 @@ import (
 	"testing"
 )
 
+func TestRunProgram(t *testing.T) {
+	Run1BRC(true, 1*MBs)
+}
+
 func BenchmarkTest1GB(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Run1BRC(true, 1000*MBs)

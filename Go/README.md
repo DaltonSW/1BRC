@@ -42,14 +42,10 @@ Holy moly, down under a minute. Wild what happens when you actually research how
 
 lol I realized I had the const MBs but it wasn't multiplied, I'm a fool. Did this run wiht 32MB buffer for a slight improvement.
 
-## 6th implementation - 36.669s
+## 6th implementation - 16.641s
 
 First attempt just had me increase the buffer size to 1000MB. Instantly got a crash, so reverted that. Decided to profile again, and saw a mess of concurrency lockin attempts.
 
 Commented out the RLock/RUnlock for the Handler's city access, and that alone managed to drop the time down this much. While I don't have the expected min/max to compare, all of the averages were correct. I have to reasonably assume that it calculated min/max correctly if it was able to average correctly. (Hopefully that assumption won't be foiled by me having done something stupid...)
-
-## 7th implementation - 16.641s
-
-So... this wasn't actually another implementation. I don't think I changed anything, but suddenly it ran WAY faster. There might be some funkiness with how much memory is getting allocated to WSL, or... something like that(?)
 
 Retroactively amending this and adding a second to it. Allocated 24GB of RAM to WSL, and ran the test 10 times and took an average instead of just sending the single lowest number I've gotten. This will be my methodology going forward.
