@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
-	// "math"
 	"os"
 	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
 )
-
-import "github.com/charmbracelet/log"
 
 type city struct {
 	count int
@@ -33,7 +31,6 @@ func NewCity() *city {
 	return &c
 }
 
-// TODO: Try implementing a channel per city so that each city doesn't need a mutex
 func (c *city) process(in float64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -58,9 +55,9 @@ type mapHandler struct {
 }
 
 func (handler *mapHandler) process(name string, in string) {
-	handler.mu.RLock()
+	//handler.mu.RLock()
 	c, exist := handler.mapping[name]
-	handler.mu.RUnlock()
+	//handler.mu.RUnlock()
 
 	if !exist {
 		c = NewCity()
@@ -94,18 +91,22 @@ func check(e error) {
 	}
 }
 
+const KBs = 1024
+const MBs = 1024 * KBs
+
 func main() {
 	file, err := os.Create("1BRC.prof")
 	check(err)
 	pprof.StartCPUProfile(file)
-	Run1BRC(false)
-	pprof.StopCPUProfile()
+	defer pprof.StopCPUProfile()
+
+	start := time.Now()
+	Run1BRC(false, 8*MBs)
+	elapsed := time.Since(start)
+	fmt.Printf("Processing took %s\n", elapsed)
 }
 
-const BufferSize = 750
-const MBs = 1024
-
-func Run1BRC(test bool) {
+func Run1BRC(test bool, bufferSize int) {
 	var input *os.File
 	var err error
 
@@ -117,7 +118,7 @@ func Run1BRC(test bool) {
 	check(err)
 	defer input.Close()
 
-	lineBuffer := make([]byte, BufferSize*MBs)
+	lineBuffer := make([]byte, bufferSize)
 	fileReader := bufio.NewReader(input)
 
 	var wg sync.WaitGroup
@@ -164,12 +165,7 @@ func Run1BRC(test bool) {
 
 func ProcessChunk(handler *mapHandler, lines []string) {
 	for _, line := range lines {
-		// log.Info("", "line", line)
 		line := strings.Split(line, ";")
-		if len(line) == 1 {
-			log.Error("Line couldn't be parsed!", "line", line)
-
-		}
 		city, temp := line[0], line[1]
 		handler.process(city, temp)
 	}

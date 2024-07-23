@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"sync"
 
-	// "math"
 	"os"
 	"runtime/pprof"
 	"sort"
@@ -18,6 +18,7 @@ type city struct {
 	total float64
 	min   float64
 	max   float64
+	mu    sync.RWMutex
 }
 
 func NewCity() *city {
@@ -30,6 +31,9 @@ func NewCity() *city {
 }
 
 func (c *city) process(in float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.count += 1
 	c.total += in
 	if in < c.min {
@@ -40,23 +44,25 @@ func (c *city) process(in float64) {
 	}
 }
 
-func (c city) getAvg() float64 {
+func (c *city) getAvg() float64 {
 	return c.total / float64(c.count)
 }
 
 type mapHandler struct {
 	mapping map[string]*city
-	mu      sync.Mutex
+	mu      sync.RWMutex
 }
 
 func (handler *mapHandler) process(name string, in string) {
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-
+	handler.mu.RLock()
 	c, exist := handler.mapping[name]
+	handler.mu.RUnlock()
+
 	if !exist {
 		c = NewCity()
+		handler.mu.Lock()
 		handler.mapping[name] = c
+		handler.mu.Unlock()
 	}
 
 	float, err := strconv.ParseFloat(in, 64)
@@ -66,9 +72,6 @@ func (handler *mapHandler) process(name string, in string) {
 }
 
 func (handler *mapHandler) getSortedKeys() []string {
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-
 	keys := make([]string, 0, len(handler.mapping))
 	for k := range handler.mapping {
 		keys = append(keys, k)
@@ -78,9 +81,6 @@ func (handler *mapHandler) getSortedKeys() []string {
 }
 
 func (handler *mapHandler) getCity(name string) *city {
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-
 	return handler.mapping[name]
 }
 
@@ -90,18 +90,18 @@ func check(e error) {
 	}
 }
 
+const KBs = 1024
+const MBs = 1024 * KBs
+
 func main() {
 	file, err := os.Create("1BRC.prof")
 	check(err)
 	pprof.StartCPUProfile(file)
-	Run1BRC(false)
-	pprof.StopCPUProfile()
+	defer pprof.StopCPUProfile()
+	Run1BRC(false, 8*MBs)
 }
 
-const ChunkSize = 2048
-const NumWorkers = 4
-
-func Run1BRC(test bool) {
+func Run1BRC(test bool, bufferSize int) {
 	var input *os.File
 	var err error
 
@@ -113,22 +113,39 @@ func Run1BRC(test bool) {
 	check(err)
 	defer input.Close()
 
-	lines := make(chan string, 100)
+	lineBuffer := make([]byte, bufferSize)
+	fileReader := bufio.NewReader(input)
+
 	var wg sync.WaitGroup
-
 	handler := mapHandler{mapping: make(map[string]*city)}
+	remainder := ""
 
-	for i := 0; i < NumWorkers; i++ {
+	for {
+		num, err := fileReader.Read(lineBuffer)
+		if num == 0 {
+			if err == io.EOF {
+				break
+			}
+			check(err)
+			break
+		}
+
+		chunk := remainder + string(lineBuffer[:num])
+		lines := strings.Split(chunk, "\n")
+
+		remainder = lines[len(lines)-1]
+		lines = lines[:len(lines)-1]
+
 		wg.Add(1)
-		go ProcessLine(&handler, &wg, lines)
+		go func(lines []string) {
+			defer wg.Done()
+			ProcessChunk(&handler, lines)
+		}(lines)
 	}
 
-	scanner := bufio.NewScanner(input)
-	for scanner.Scan() {
-		lines <- scanner.Text()
+	if remainder != "" {
+		ProcessChunk(&handler, []string{remainder})
 	}
-
-	close(lines)
 
 	wg.Wait()
 
@@ -141,10 +158,8 @@ func Run1BRC(test bool) {
 	}
 }
 
-func ProcessLine(handler *mapHandler, wg *sync.WaitGroup, lines chan string) {
-	defer wg.Done()
-
-	for line := range lines {
+func ProcessChunk(handler *mapHandler, lines []string) {
+	for _, line := range lines {
 		line := strings.Split(line, ";")
 		city, temp := line[0], line[1]
 		handler.process(city, temp)

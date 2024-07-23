@@ -6,7 +6,6 @@ import (
 	"io"
 	"sync"
 
-	// "math"
 	"os"
 	"runtime/pprof"
 	"sort"
@@ -31,6 +30,7 @@ func NewCity() *city {
 	return &c
 }
 
+// TODO: Try implementing a channel per city so that each city doesn't need a mutex
 func (c *city) process(in float64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -91,18 +91,18 @@ func check(e error) {
 	}
 }
 
-const KBs = 1024
-const MBs = 1024 * KBs
-
 func main() {
 	file, err := os.Create("1BRC.prof")
 	check(err)
 	pprof.StartCPUProfile(file)
-	defer pprof.StopCPUProfile()
-	Run1BRC(false, 8*MBs)
+	Run1BRC(false)
+	pprof.StopCPUProfile()
 }
 
-func Run1BRC(test bool, bufferSize int) {
+const BufferSize = 750
+const MBs = 1024
+
+func Run1BRC(test bool) {
 	var input *os.File
 	var err error
 
@@ -114,7 +114,7 @@ func Run1BRC(test bool, bufferSize int) {
 	check(err)
 	defer input.Close()
 
-	lineBuffer := make([]byte, bufferSize)
+	lineBuffer := make([]byte, BufferSize*MBs)
 	fileReader := bufio.NewReader(input)
 
 	var wg sync.WaitGroup
@@ -162,10 +162,6 @@ func Run1BRC(test bool, bufferSize int) {
 func ProcessChunk(handler *mapHandler, lines []string) {
 	for _, line := range lines {
 		line := strings.Split(line, ";")
-		// if len(line) == 1 {
-		// 	log.Error("Line couldn't be parsed!", "line", line)
-		//
-		// }
 		city, temp := line[0], line[1]
 		handler.process(city, temp)
 	}
