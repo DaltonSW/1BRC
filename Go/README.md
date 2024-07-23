@@ -1,6 +1,6 @@
 # Go
 
-**Current Best: 16.641s**
+**Current Best: 13.991s**
 
 ## 1st implementation - 2m 30.66s (150.66)
 
@@ -49,3 +49,9 @@ First attempt just had me increase the buffer size to 1000MB. Instantly got a cr
 Commented out the RLock/RUnlock for the Handler's city access, and that alone managed to drop the time down this much. While I don't have the expected min/max to compare, all of the averages were correct. I have to reasonably assume that it calculated min/max correctly if it was able to average correctly. (Hopefully that assumption won't be foiled by me having done something stupid...)
 
 Retroactively amending this and adding a second to it. Allocated 24GB of RAM to WSL, and ran the test 10 times and took an average instead of just sending the single lowest number I've gotten. This will be my methodology going forward.
+
+## 7th implementation - 13.991s
+
+For this implementation, I'm parsing the input as bytes instead of string. Also manually parsing to find the semicolon instead of using strings.Split or bytes.Split
+
+Also, after doing some benchmarking, discovered that just using min() and max() were way faster than manual calculation, so I swapped those in.

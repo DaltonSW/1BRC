@@ -15,11 +15,6 @@ import (
 	"sort"
 )
 
-// ISSUE: Worst Profiling Offenders are marked with issues
-//	- Half of the time is spent in mapHandler process
-//	- ProcessChunk -- strings.Split (18.4%)
-//	- Run1BRC -- strings.Split (5.1%)
-
 // IDEA: Figure out how to parse the chunk in such a way that the goroutines can handle splitting
 
 // IDEA: Multiply string by 10 to convert float into int to make math better for CPU
@@ -122,6 +117,7 @@ func ProcessChunk(handler *mapHandler, lines [][]byte) {
 		if lineLen < 2 {
 			break
 		}
+		// NOTE: Manually locate semicolon instead of using bytes.Split or strings.Split
 		var semi int
 		index := lineLen - 4 // 4 back is the first one that could possibly be a semicolon
 		if line[index] == ';' {
@@ -136,46 +132,6 @@ func ProcessChunk(handler *mapHandler, lines [][]byte) {
 		handler.process(string(city), string(temp))
 	}
 }
-
-// INFO: For number processing, we're reading the bytestring backwards
-
-// func ProcessChunk(handler *mapHandler, lines [][]byte) {
-// 	for _, line := range lines {
-// 		lineLen := len(line)
-// 		if lineLen == 0 {
-// 			break
-// 		}
-//
-// 		index := lineLen - 1
-//
-// 		temp := int32(line[index] - '0') // Subtract '0' to convert string int into actual int
-// 		index -= 2                       // Skip over the period so we just consider the float an int until the end
-//
-// 		temp += int32((line[index] - '0') * 10)
-// 		index--
-//
-// 		if line[index] != ';' { // If the number is still going...
-// 			if line[index] == '-' { // Checks if negative
-// 				temp = -temp
-// 				index--
-// 				break
-// 			}
-//
-// 			temp += int32((line[index] - '0') * 100)
-// 			index--
-//
-// 			if line[index] == '-' {
-// 				temp = -temp
-// 				index--
-// 			}
-// 		}
-// 		cityName := string(line[:index]) // line[index] should be the semicolon now
-//
-// 		fmt.Printf("%v -> %v : %v\n", string(line), cityName, temp)
-//
-// 		handler.process(cityName, temp)
-// 	}
-// }
 
 type city struct {
 	count int
@@ -192,8 +148,6 @@ func NewCity() *city {
 
 	return c
 }
-
-// ISSUE: This is taking 15.33% of the total time. Why?
 
 // NOTE: Did some benchmarking, using min() and max() are way faster than manual comparison
 func (c *city) process(in int32) {
@@ -212,7 +166,6 @@ type mapHandler struct {
 	mu      sync.RWMutex
 }
 
-// ISSUE: Map access alone is taking 15%
 func (handler *mapHandler) process(name string, inTemp string) {
 	c, exist := handler.mapping[name]
 
