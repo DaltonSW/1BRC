@@ -131,9 +131,6 @@ func NewCity() *city {
 }
 
 func (c *city) process(in float64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.count += 1
 	c.total += in
 	if in < c.min {
