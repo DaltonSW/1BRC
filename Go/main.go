@@ -33,16 +33,26 @@ func main() {
 	defer pprof.StopCPUProfile()
 
 	countPtr := flag.Int("count", 10, "Number of tests to run and average")
+	bufferPtr := flag.Int("buffer", 8, "MB to use for buffer")
+	testPtr := flag.Bool("test", false, "Run the smaller input file")
 	flag.Parse()
 
 	testCount := *countPtr
 
+	bufferSize := int(*bufferPtr)
+
+	fmt.Println("Running initial pass before starting timing")
+	Run1BRC(*testPtr, bufferSize*MBs)
 	fmt.Printf("Processing %d tests.\n", testCount)
+
 	start := time.Now()
+
 	for i := 0; i < testCount; i++ {
-		Run1BRC(false, 8*MBs)
+		Run1BRC(*testPtr, bufferSize*MBs)
 	}
+
 	elapsed := time.Since(start)
+
 	average := elapsed.Seconds() / float64(testCount)
 	fmt.Printf("Took a total of %s\n", elapsed)
 	fmt.Printf("Took an average of %.3fs\n", average)
