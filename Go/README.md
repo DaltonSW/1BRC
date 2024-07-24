@@ -1,6 +1,6 @@
 # Go
 
-**Current Best: 13.991s**
+**Current Best: 12.131s**
 
 ## 1st implementation - 2m 30.66s (150.66)
 
@@ -55,3 +55,7 @@ Retroactively amending this and adding a second to it. Allocated 24GB of RAM to 
 For this implementation, I'm parsing the input as bytes instead of string. Also manually parsing to find the semicolon instead of using strings.Split or bytes.Split
 
 Also, after doing some benchmarking, discovered that just using min() and max() were way faster than manual calculation, so I swapped those in.
+
+## 8th implementation - 12.191s
+
+Opted to parse the string as an int instead of a float to get rid of ParseFloat. Also went back to using int64s to get rid of silly conversions that aren't necessary right now (if ever)

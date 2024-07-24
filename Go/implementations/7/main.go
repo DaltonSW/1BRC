@@ -21,7 +21,11 @@ import (
 
 // IDEA: See if converting int to string and manually slotting a period in is faster than int -> float and string format
 
+// IDEA: Parse the string backwards
+
 // IDEA: Don't use structs and try normal vars and funcs
+
+// IDEA: Try int32 instead of int64
 
 const KBs = 1024
 const MBs = 1024 * KBs
@@ -79,9 +83,6 @@ func Run1BRC(test bool, bufferSize int) {
 
 		bytesRead := lineBuffer[:num]
 		chunk := append(remainder, bytesRead...)
-
-		// ISSUE: Byte splitting like this is taking 13.7%
-		// IDEA:  Figure out a way to do the splitting in goroutines
 		splitChunk := bytes.Split(chunk, []byte{'\n'})
 
 		chunkLineCount := len(splitChunk) - 1
@@ -116,6 +117,7 @@ func ProcessChunk(handler *mapHandler, lines [][]byte) {
 		if lineLen < 2 {
 			break
 		}
+		// NOTE: Manually locate semicolon instead of using bytes.Split or strings.Split
 		var semi int
 		index := lineLen - 4 // 4 back is the first one that could possibly be a semicolon
 		if line[index] == ';' {
@@ -126,16 +128,16 @@ func ProcessChunk(handler *mapHandler, lines [][]byte) {
 			semi = index - 2
 		}
 		city := line[:semi]
-		temp := append(line[semi+1:lineLen-2], line[lineLen-1])
+		temp := line[semi+1:]
 		handler.process(string(city), string(temp))
 	}
 }
 
 type city struct {
 	count int
-	total int64
-	min   int64
-	max   int64
+	total int32
+	min   int32
+	max   int32
 }
 
 func NewCity() *city {
@@ -147,9 +149,8 @@ func NewCity() *city {
 	return c
 }
 
-// ISSUE: This is taking 26.23% of the total time. Why?!
-// IDEA: Maybe try un-struct'ing it...?
-func (c *city) process(in int64) {
+// NOTE: Did some benchmarking, using min() and max() are way faster than manual comparison
+func (c *city) process(in int32) {
 	c.count += 1
 	c.total += in
 	c.min = min(c.min, in)
@@ -165,8 +166,6 @@ type mapHandler struct {
 	mu      sync.RWMutex
 }
 
-// ISSUE: Map access alone is taking 24.9%
-// IDEA: I could... write my own hash map...*shudder*
 func (handler *mapHandler) process(name string, inTemp string) {
 	c, exist := handler.mapping[name]
 
@@ -177,12 +176,10 @@ func (handler *mapHandler) process(name string, inTemp string) {
 		handler.mu.Unlock()
 	}
 
-	// ISSUE: ParseInt is taking 7.1%
-	// IDEA:  Manually parse the temp bytes into an int directly, skip strings entirely for temp
-	temp, err := strconv.ParseInt(inTemp, 10, 64)
+	float, err := strconv.ParseFloat(inTemp, 64)
 	check(err)
 
-	c.process(temp)
+	c.process(int32(float * 10))
 }
 
 func (handler *mapHandler) getSortedKeys() []string {
