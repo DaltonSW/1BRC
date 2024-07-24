@@ -58,24 +58,32 @@ func main() {
 	fmt.Printf("Took an average of %.3fs\n", average)
 }
 
+type city struct {
+	Min int64
+	Max int64
+	Sum int64
+	Cnt int64
+}
+
 func Run1BRC(test bool, bufferSize int) {
 	var input *os.File
 	var err error
 
 	if test {
-		input, err = os.Open("../test_measurements.txt")
+		input, err = os.Open("../test_measurements_small.txt")
 	} else {
 		input, err = os.Open("../measurements.txt")
 	}
 	check(err)
 	defer input.Close()
 
+	var wg sync.WaitGroup
+
 	lineBuffer := make([]byte, bufferSize)
 	fileReader := bufio.NewReader(input)
 
-	var wg sync.WaitGroup
-	handler := mapHandler{mapping: make(map[string]*city)}
 	remainder := make([]byte, 0)
+	cityChan := make(chan map[string]city)
 
 	for {
 		num, err := fileReader.Read(lineBuffer)
@@ -83,7 +91,6 @@ func Run1BRC(test bool, bufferSize int) {
 			if err == io.EOF {
 				break
 			}
-			check(err)
 			break
 		}
 
@@ -91,7 +98,6 @@ func Run1BRC(test bool, bufferSize int) {
 		chunk := append(remainder, bytesRead...)
 
 		// ISSUE: Byte splitting like this is taking 13.7%
-		// IDEA:  Figure out a way to do the splitting in goroutines
 		splitChunk := bytes.Split(chunk, []byte{'\n'})
 
 		chunkLineCount := len(splitChunk) - 1
@@ -99,33 +105,69 @@ func Run1BRC(test bool, bufferSize int) {
 		splitChunk = splitChunk[:chunkLineCount]
 
 		wg.Add(1)
-		go func(chunk [][]byte) {
+		go func(splitChunk [][]byte) {
 			defer wg.Done()
-			ProcessChunk(&handler, chunk)
+			ProcessChunk(splitChunk, cityChan)
 		}(splitChunk)
 	}
 
 	if remainder != nil {
-		ProcessChunk(&handler, [][]byte{remainder})
+		wg.Add(1)
+		go func(splitChunk []byte) {
+			defer wg.Done()
+			ProcessChunk([][]byte{splitChunk}, cityChan)
+		}(remainder)
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(cityChan)
+	}()
 
-	keys := handler.getSortedKeys()
+	totals := make(map[string]city)
+	// fmt.Println("Starting to read from chunk channel")
+	for chunk := range cityChan {
+		for name, inCity := range chunk {
+			c, ok := totals[name]
+			if !ok {
+				totals[name] = city{
+					Min: inCity.Min,
+					Max: inCity.Max,
+					Sum: inCity.Sum,
+					Cnt: inCity.Cnt,
+				}
+				continue
+			}
+			c.Min = min(c.Min, inCity.Min)
+			c.Max = max(c.Max, inCity.Max)
+			c.Sum += inCity.Sum
+			c.Cnt += inCity.Cnt
+			totals[name] = c
+		}
+	}
 
-	for k := range keys {
-		c := handler.mapping[keys[k]]
+	names := make([]string, 0, len(totals))
+	for n := range totals {
+		names = append(names, n)
+	}
 
-		fmt.Println(fmt.Sprintf("%s=%.1f/%.1f/%.1f", keys[k], float64(c.min)*0.1, c.getAvg()*0.1, float64(c.max)*0.1))
+	sort.Strings(names)
+
+	for _, n := range names {
+		c := totals[n]
+
+		fmt.Println(fmt.Sprintf("%s=%.1f/%.1f/%.1f", n, float64(c.Min)*0.1, (float64(c.Sum)/float64(c.Cnt))*0.1, float64(c.Max)*0.1))
 	}
 }
 
-func ProcessChunk(handler *mapHandler, lines [][]byte) {
+func ProcessChunk(lines [][]byte, cityChan chan map[string]city) {
+	chunkMap := make(map[string]city)
 	for _, line := range lines {
 		lineLen := len(line)
 		if lineLen < 2 {
 			break
 		}
+
 		var semi int
 		index := lineLen - 4 // 4 back is the first one that could possibly be a semicolon
 		if line[index] == ';' {
@@ -135,73 +177,34 @@ func ProcessChunk(handler *mapHandler, lines [][]byte) {
 		} else if line[index-2] == ';' {
 			semi = index - 2
 		}
-		city := line[:semi]
-		temp := append(line[semi+1:lineLen-2], line[lineLen-1])
-		handler.process(string(city), string(temp))
+
+		name := string(line[:semi])
+		byteTemp := append(line[semi+1:lineLen-2], line[lineLen-1])
+
+		// ISSUE: ParseInt is taking 7.1%
+		// IDEA:  Manually parse the temp bytes into an int directly, skip strings entirely for temp
+		temp, _ := strconv.ParseInt(string(byteTemp), 10, 64)
+
+		c, ok := chunkMap[name]
+
+		if !ok {
+			c = city{
+
+				Cnt: 1,
+				Max: temp,
+				Min: temp,
+				Sum: temp,
+			}
+		} else {
+			c.Cnt++
+			c.Max = max(c.Max, temp)
+			c.Min = min(c.Min, temp)
+			c.Sum += temp
+		}
+		chunkMap[name] = c
 	}
-}
-
-type city struct {
-	count int
-	total int64
-	min   int64
-	max   int64
-}
-
-func NewCity() *city {
-	c := &city{}
-
-	c.max = -9999
-	c.min = 9999
-
-	return c
-}
-
-// ISSUE: This is taking 26.23% of the total time. Why?!
-// IDEA: Maybe try un-struct'ing it...?
-func (c *city) process(in int64) {
-	c.count += 1
-	c.total += in
-	c.min = min(c.min, in)
-	c.max = max(c.max, in)
-}
-
-func (c *city) getAvg() float64 {
-	return float64(c.total) / float64(c.count)
-}
-
-type mapHandler struct {
-	mapping map[string]*city
-	mu      sync.RWMutex
-}
-
-// ISSUE: Map access alone is taking 24.9%
-// IDEA: I could... write my own hash map...*shudder*
-func (handler *mapHandler) process(name string, inTemp string) {
-	c, exist := handler.mapping[name]
-
-	if !exist {
-		c = NewCity()
-		handler.mu.Lock()
-		handler.mapping[name] = c
-		handler.mu.Unlock()
-	}
-
-	// ISSUE: ParseInt is taking 7.1%
-	// IDEA:  Manually parse the temp bytes into an int directly, skip strings entirely for temp
-	temp, err := strconv.ParseInt(inTemp, 10, 64)
-	check(err)
-
-	c.process(temp)
-}
-
-func (handler *mapHandler) getSortedKeys() []string {
-	keys := make([]string, 0, len(handler.mapping))
-	for k := range handler.mapping {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	// fmt.Println("Putting chunk map on channel")
+	cityChan <- chunkMap
 }
 
 func check(e error) {
