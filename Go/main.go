@@ -15,44 +15,44 @@ import (
 	"sort"
 )
 
-// IDEA: Figure out how to parse the chunk in such a way that the goroutines can handle splitting
-
-// IDEA: Multiply string by 10 to convert float into int to make math better for CPU
-
-// IDEA: See if converting int to string and manually slotting a period in is faster than int -> float and string format
-
-// IDEA: Don't use structs and try normal vars and funcs
-
 const KBs = 1024
 const MBs = 1024 * KBs
 
 func main() {
+	// Flags
+	countPtr := flag.Int("count", 10, "Number of tests to run and average")
+	bufferPtr := flag.Int("buffer", 8, "MB to use for buffer")
+	testPtr := flag.Bool("test", false, "Run the smaller input file")
+	flag.Parse()
+	testCount := *countPtr
+	bufferSize := int(*bufferPtr)
+
+	var filepath string
+	if *testPtr {
+		filepath = "../test_measurements.txt"
+	} else {
+		filepath = "../measurements.txt"
+	}
+
+	// Initial run
+	fmt.Println("Running initial pass before starting timing")
+	Run1BRC(bufferSize*MBs, filepath)
+
+	// Start profiling
 	file, err := os.Create("1BRC.prof")
 	check(err)
 	pprof.StartCPUProfile(file)
 	defer pprof.StopCPUProfile()
 
-	countPtr := flag.Int("count", 10, "Number of tests to run and average")
-	bufferPtr := flag.Int("buffer", 8, "MB to use for buffer")
-	testPtr := flag.Bool("test", false, "Run the smaller input file")
-	flag.Parse()
-
-	testCount := *countPtr
-
-	bufferSize := int(*bufferPtr)
-
-	fmt.Println("Running initial pass before starting timing")
-	Run1BRC(*testPtr, bufferSize*MBs)
-	fmt.Printf("Processing %d tests.\n", testCount)
-
+	// Test running
 	start := time.Now()
-
+	fmt.Printf("Processing %d tests.\n", testCount)
 	for i := 0; i < testCount; i++ {
-		Run1BRC(*testPtr, bufferSize*MBs)
+		Run1BRC(bufferSize*MBs, filepath)
 	}
-
 	elapsed := time.Since(start)
 
+	// Print info
 	average := elapsed.Seconds() / float64(testCount)
 	fmt.Printf("Took a total of %s\n", elapsed)
 	fmt.Printf("Took an average of %.3fs\n", average)
@@ -65,26 +65,23 @@ type city struct {
 	Cnt int64
 }
 
-func Run1BRC(test bool, bufferSize int) {
+func Run1BRC(bufferSize int, filepath string) {
+	// var declarations
 	var input *os.File
 	var err error
-
-	if test {
-		input, err = os.Open("../test_measurements_small.txt")
-	} else {
-		input, err = os.Open("../measurements.txt")
-	}
-	check(err)
-	defer input.Close()
-
 	var wg sync.WaitGroup
 
 	lineBuffer := make([]byte, bufferSize)
-	fileReader := bufio.NewReader(input)
-
 	remainder := make([]byte, 0)
 	cityChan := make(chan map[string]city)
 
+	// Open measurements
+	input, err = os.Open(filepath)
+	check(err)
+	defer input.Close()
+	fileReader := bufio.NewReader(input)
+
+	// Loop reading
 	for {
 		num, err := fileReader.Read(lineBuffer)
 		if num == 0 {
@@ -125,7 +122,6 @@ func Run1BRC(test bool, bufferSize int) {
 	}()
 
 	totals := make(map[string]city)
-	// fmt.Println("Starting to read from chunk channel")
 	for chunk := range cityChan {
 		for name, inCity := range chunk {
 			c, ok := totals[name]
@@ -203,7 +199,6 @@ func ProcessChunk(lines [][]byte, cityChan chan map[string]city) {
 		}
 		chunkMap[name] = c
 	}
-	// fmt.Println("Putting chunk map on channel")
 	cityChan <- chunkMap
 }
 
