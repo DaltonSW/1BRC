@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"strconv"
 	"sync"
 	"time"
 
@@ -21,7 +20,7 @@ const MBs = 1024 * KBs
 func main() {
 	// Flags
 	countPtr := flag.Int("count", 10, "Number of tests to run and average")
-	bufferPtr := flag.Int("buffer", 8, "MB to use for buffer")
+	bufferPtr := flag.Int("buffer", 16, "MB to use for buffer")
 	testPtr := flag.Bool("test", false, "Run the smaller input file")
 	flag.Parse()
 	testCount := *countPtr
@@ -59,9 +58,9 @@ func main() {
 }
 
 type city struct {
-	Min int64
-	Max int64
-	Sum int64
+	Min int32
+	Max int32
+	Sum int32
 	Cnt int
 }
 
@@ -165,20 +164,48 @@ func ProcessChunk(lines [][]byte, cityChan chan map[string]*city) {
 		// TODO: Combine finding the semicolon and parsing the number into one loop backwards
 
 		var semi int
-		index := lineLen - 4 // 4 back is the first one that could possibly be a semicolon
-		if line[index] == ';' {
-			semi = index
-		} else if line[index-1] == ';' {
-			semi = index - 1
-		} else if line[index-2] == ';' {
-			semi = index - 2
+		var ones, tens, hundreds, temp int32
+		var negative bool
+		index := lineLen - 1
+
+		ones = int32(line[index] - '0')
+		index -= 2 // Skip the period
+
+		tens = int32(line[index] - '0')
+		index--
+
+		var loopDone bool
+
+		for {
+			char := line[index]
+			switch char {
+			case ';':
+				semi = index
+				loopDone = true
+
+			case '-':
+				negative = true
+				semi = index - 1
+				loopDone = true
+			default:
+				hundreds = int32(line[index] - '0')
+				index--
+			}
+			if loopDone {
+				break
+			}
+		}
+
+		temp = hundreds*100 + tens*10 + ones
+		if negative {
+			temp = -temp
 		}
 
 		// PERF: 22.5% -- slicebytetostring
 		name := string(line[:semi])
-		byteTemp := string(append(line[semi+1:lineLen-2], line[lineLen-1]))
+		//byteTemp := string(append(line[semi+1:lineLen-2], line[lineLen-1]))
 
-		temp, _ := strconv.ParseInt(byteTemp, 10, 64) // PERF: 9% -- ParseInt
+		//temp, _ := strconv.ParseInt(byteTemp, 10, 64) // PERF: 9% -- ParseInt
 
 		// PERF: 26.3% -- mapaccess2_faststr
 		c, ok := chunkMap[name]
