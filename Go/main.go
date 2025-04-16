@@ -8,6 +8,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"unicode"
 
 	"os"
 	"runtime/pprof"
@@ -71,8 +72,8 @@ func Run1BRC(bufferSize int, filepath string) {
 	var wg sync.WaitGroup
 
 	lineBuffer := make([]byte, bufferSize)
-	remainder := make([]byte, 0)
-	cityChan := make(chan map[string]*city)
+	remainder := make([]byte, 0, bufferSize)
+	cityChan := make(chan map[string]*city, 10)
 
 	// Open measurements
 	input, err = os.Open(filepath)
@@ -93,7 +94,7 @@ func Run1BRC(bufferSize int, filepath string) {
 		bytesRead := lineBuffer[:num]
 		chunk := append(remainder, bytesRead...)
 
-		splitChunk := bytes.Split(chunk, []byte{'\n'}) // PERF: 11.7% -- bytes.Split
+		splitChunk := bytes.Split(chunk, []byte{'\n'}) // PERF: 12.1% -- bytes.Split
 
 		chunkLineCount := len(splitChunk) - 1
 		remainder = splitChunk[chunkLineCount]
@@ -101,16 +102,16 @@ func Run1BRC(bufferSize int, filepath string) {
 
 		wg.Add(1)
 		go func(splitChunk [][]byte) {
-			defer wg.Done()
 			ProcessChunk(splitChunk, cityChan)
+			wg.Done()
 		}(splitChunk)
 	}
 
 	if remainder != nil {
 		wg.Add(1)
 		go func(splitChunk []byte) {
-			defer wg.Done()
 			ProcessChunk([][]byte{splitChunk}, cityChan)
+			wg.Done()
 		}(remainder)
 	}
 
@@ -161,11 +162,8 @@ func ProcessChunk(lines [][]byte, cityChan chan map[string]*city) {
 			break
 		}
 
-		// TODO: Combine finding the semicolon and parsing the number into one loop backwards
-
 		var semi int
 		var ones, tens, hundreds, temp int32
-		var negative bool
 		index := lineLen - 1
 
 		ones = int32(line[index] - '0')
@@ -174,40 +172,24 @@ func ProcessChunk(lines [][]byte, cityChan chan map[string]*city) {
 		tens = int32(line[index] - '0')
 		index--
 
-		var loopDone bool
-
-		for {
-			char := line[index]
-			switch char {
-			case ';':
-				semi = index
-				loopDone = true
-
-			case '-':
-				negative = true
-				semi = index - 1
-				loopDone = true
-			default:
-				hundreds = int32(line[index] - '0')
-				index--
-			}
-			if loopDone {
-				break
-			}
+		if unicode.IsDigit(rune(line[index])) {
+			hundreds = int32(line[index] - '0')
+			index--
 		}
 
 		temp = hundreds*100 + tens*10 + ones
-		if negative {
+
+		if bytes.Equal([]byte{line[index]}, []byte{'-'}) {
 			temp = -temp
+			index--
 		}
 
-		// PERF: 22.5% -- slicebytetostring
+		semi = index
+
+		// PERF: 20.8% -- slicebytetostring
 		name := string(line[:semi])
-		//byteTemp := string(append(line[semi+1:lineLen-2], line[lineLen-1]))
 
-		//temp, _ := strconv.ParseInt(byteTemp, 10, 64) // PERF: 9% -- ParseInt
-
-		// PERF: 26.3% -- mapaccess2_faststr
+		// PERF: 30.8% -- mapaccess2_faststr
 		c, ok := chunkMap[name]
 		if !ok {
 			chunkMap[name] = &city{
